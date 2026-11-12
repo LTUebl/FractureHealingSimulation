@@ -1,0 +1,11 @@
+# Node/OS
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Reference PDFs & large video files (not part of published static site)
+*.pdf
+*.PDF
+*.mov
+*.MOV

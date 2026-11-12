@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bone Fracture Healing &amp; Mechanoregulation Simulator | LTU BME 5313 / 6303</title>
+  <meta name="description" content="Interactive computational bone fracture healing simulator based on Byrne, Lacroix &amp; Prendergast (2011) and Perier-Metz, Duda &amp; Checa (2020): mechanoregulation of MSC lattice activity, fixation stiffness, gait loading, fracture gap stability, and bone grafts.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- SITE HEADER: LTU Experimental Biomechanics Laboratory (EBL) Branding      -->
+  <!-- ========================================================================= -->
+  <header class="site-header">
+    <div class="brand-wrapper">
+      <img src="EBLlogo.png" alt="LTU EBL Logo" class="brand-logo" onerror="this.onerror=null; this.src='https://storage.googleapis.com/eblsquattracker/EBLlogo2.png';">
+      <div class="brand-titles">
+        <h1>LTU Cellular Mechanobiology &middot; BME 5313 / 6303</h1>
+        <p>Bone Fracture Healing &amp; Mechanoregulation Lattice Simulator (Byrne, Lacroix &amp; Prendergast 2011)</p>
+      </div>
+    </div>
+
+    <div class="header-nav">
+      <button class="btn btn-secondary btn-sm" id="btn-theory" title="View Mechanoregulation Theory, Tables &amp; Equations">
+        <span>&#128214; Theory &amp; Equations</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-quiz" title="Test your understanding with BME 5313 / 6303 practice questions">
+        <span>&#9997;&#65039; Practice Quiz</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-export-csv" title="Export healing trajectory and current callus state to CSV">
+        <span>&#128229; Export CSV</span>
+      </button>
+      <button class="btn btn-primary btn-sm" id="btn-reset" title="Reset to Byrne et al. (2011) Baseline Tibia Fracture">
+        <span>&#8634; Reset Baseline</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MODE NAVIGATION BAR (4 Clear Pedagogical Tabs)                            -->
+  <!-- ========================================================================= -->
+  <nav class="mode-navigation-bar">
+    <button class="nav-tab-btn active" data-mode="timeline" id="tab-btn-timeline">
+      <span>1. Healing Timeline &amp; Stiffness</span>
+      <span class="nav-tab-badge">Figs. 4&ndash;5</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="stimulus" id="tab-btn-stimulus">
+      <span>2. Mechanoregulation Diagram (S)</span>
+      <span class="nav-tab-badge">Fig. 3 Live</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="spatial" id="tab-btn-spatial">
+      <span>3. Spatial Callus &amp; Graft Effects</span>
+      <span class="nav-tab-badge">Regions &amp; Grafts</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="model" id="tab-btn-model">
+      <span>4. How the Model Works</span>
+      <span class="nav-tab-badge">Fig. 1 &amp; Tables</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN 2-COLUMN APPLICATION GRID                                            -->
+  <!-- ========================================================================= -->
+  <main class="app-container">
+
+    <!-- ======================================================================= -->
+    <!-- LEFT COLUMN: Tibia + Callus Lattice Visualizer, Playback & 6 Metrics    -->
+    <!-- ======================================================================= -->
+    <section class="panel-card panel-visualizer">
+      <div class="panel-header">
+        <div class="panel-header-titles">
+          <h2>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3v4l-2 3v4l2 3v4"/><path d="M16 3v4l2 3v4l-2 3v4"/><line x1="6" y1="12" x2="18" y2="12" stroke-dasharray="2 2"/></svg>
+            Tibia Fracture &amp; Callus Lattice Visualizer
+          </h2>
+          <span class="panel-subtitle">Left: Whole-tibia &amp; fixation hardware &middot; Right: Magnified sagittal callus cross-section (hover to inspect)</span>
+        </div>
+
+        <div class="view-presets-bar" id="field-selector-bar">
+          <button class="btn-view-pill active" data-field="phenotype" title="Color by tissue type: Granulation, Fibrous, Cartilage, Bone">Tissue Type</button>
+          <button class="btn-view-pill" data-field="stimulus" title="Color by Prendergast stimulus S = gamma/a + v/b">Stimulus (S)</button>
+          <button class="btn-view-pill" data-field="strain_flow" title="Octahedral shear strain &amp; fluid flow vectors">Strain &amp; Flow</button>
+          <button class="btn-view-pill" data-field="cells" title="Show MSCs, Fibroblasts, Chondrocytes, Osteoblasts, Osteoclasts">Cell Activity</button>
+        </div>
+      </div>
+
+      <div class="panel-body">
+
+        <!-- Plain-English Healing Outcome Banner -->
+        <div class="outcome-banner success" id="outcome-banner">
+          <div style="display:flex; align-items:center; gap:0.55rem; flex-wrap:wrap;">
+            <span class="outcome-badge" id="outcome-badge">Union &amp; Remodeling</span>
+            <span id="outcome-summary-text">Standard 3 mm tibial fracture achieves clinical union (~15 Nm/deg) around Day 122, then resorbs excess callus.</span>
+          </div>
+        </div>
+
+        <!-- Playback & Day Scrubber Bar -->
+        <div class="timeline-playback-bar">
+          <button class="btn-timelapse" id="btn-play-timelapse" title="Play or pause the 380-day bone healing simulation">
+            <span>&#9654; Play Healing</span>
+          </button>
+
+          <div class="timeline-scrubber-wrap">
+            <div class="timeline-scrubber-top">
+              <span>Time: <strong id="lbl-day-week">Day 122 (Week 17.4)</strong></span>
+              <span id="lbl-phase-name">Phase: Hard Callus &rarr; Fixator Removal</span>
+            </div>
+            <input type="range" id="slider-day" min="0" max="380" step="4" value="122" class="range-slider">
+            <div class="timeline-day-ticks">
+              <span>Day 0</span>
+              <span>Wk 6 (42d)</span>
+              <span>Wk 17 (120d)</span>
+              <span>Wk 35 (244d)</span>
+              <span>Day 380</span>
+            </div>
+          </div>
+
+          <div class="speed-pills" title="Playback speed">
+            <button class="btn-speed active" data-speed="1">1&times;</button>
+            <button class="btn-speed" data-speed="2">2&times;</button>
+            <button class="btn-speed" data-speed="4">4&times;</button>
+          </div>
+        </div>
+
+        <!-- Simple Visual Overlay Checkboxes -->
+        <div class="canvas-overlay-toggles">
+          <label class="overlay-chk-label" title="Display external fixator, locking plate, or IM nail">
+            <input type="checkbox" id="toggle-hardware" checked>
+            <span>Fixation Hardware</span>
+          </label>
+          <label class="overlay-chk-label" title="Show physiological gait loads and fluid flow arrows">
+            <input type="checkbox" id="toggle-vectors" checked>
+            <span>Load &amp; Flow Vectors</span>
+          </label>
+          <label class="overlay-chk-label" title="Overlay migrating MSCs and differentiated cells on the lattice">
+            <input type="checkbox" id="toggle-cells" checked>
+            <span>Lattice Cells</span>
+          </label>
+          <label class="overlay-chk-label" title="Show Anterior/Posterior/Medullary/Callus anatomical labels">
+            <input type="checkbox" id="toggle-regions" checked>
+            <span>Region Labels</span>
+          </label>
+        </div>
+
+        <!-- Dual-Viewport Interactive Canvas -->
+        <div class="canvas-container" id="canvas-wrapper">
+          <canvas id="sim-canvas"></canvas>
+
+          <div class="canvas-legend-pill" id="canvas-legend-pill">
+            <span class="legend-item"><span class="legend-swatch" style="background:#fda4af;"></span>Granulation</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#ef4444;"></span>Fibrous</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#8b5cf6;"></span>Cartilage</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#84cc16;"></span>Immature Bone</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#15803d;"></span>Mature Bone</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#e7e5e4;"></span>Cortical</span>
+          </div>
+
+          <div class="canvas-floating-controls">
+            <button class="canvas-floating-btn" id="btn-zoom-in" title="Zoom In">+</button>
+            <button class="canvas-floating-btn" id="btn-zoom-out" title="Zoom Out">&minus;</button>
+            <button class="canvas-floating-btn" id="btn-view-reset" title="Reset View">&#10530;</button>
+          </div>
+
+          <div class="canvas-hud-overlay" id="canvas-hud">
+            <span id="hud-gap-fix">Gap: 3.0 mm &middot; Ext. Fixator (100%)</span>
+            <span id="hud-wb">Gait Load: 58%</span>
+            <span class="hud-badge-eq" id="hud-probe">Hover cross-section to inspect local tissue &amp; stimulus S</span>
+          </div>
+        </div>
+
+        <!-- 6-Card Live Metrics Ribbon -->
+        <div class="metrics-ribbon">
+          <div class="metric-pill highlight">
+            <span class="metric-label">1. Bending Stiffness</span>
+            <span class="metric-value" id="metric-stiffness">15.4 Nm/deg</span>
+            <span class="metric-sub" id="metric-stiffness-sub">Union threshold: 15 Nm/deg</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">2. Interfragmentary Strain</span>
+            <span class="metric-value" id="metric-ifs">1.12%</span>
+            <span class="metric-sub" id="metric-ifs-sub">Ant 0.7% / Post 1.1%</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">3. Clinical Union Time</span>
+            <span class="metric-value" id="metric-union">Day 122</span>
+            <span class="metric-sub" id="metric-union-sub">Fixator removed @ 15 Nm/deg</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">4. Callus Bone Content</span>
+            <span class="metric-value" id="metric-bone-pct">64.2%</span>
+            <span class="metric-sub" id="metric-bone-sub">Cart 12% &middot; Fib 4%</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">5. Gap Stimulus (S)</span>
+            <span class="metric-value" id="metric-stimulus">0.48</span>
+            <span class="metric-sub" id="metric-stimulus-sub">Favors Mature Bone</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">6. Fixator Load Share</span>
+            <span class="metric-value" id="metric-load-share">0%</span>
+            <span class="metric-sub" id="metric-load-share-sub">Hardware vs. Callus</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- RIGHT COLUMN: Presets, 4 Control Groups & Analytical Tabs               -->
+    <!-- ======================================================================= -->
+    <section class="panel-card panel-controls">
+      <div class="panel-header">
+        <div class="panel-header-titles">
+          <h2>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Clinical Controls &amp; Mechanobiology Analytics
+          </h2>
+          <span class="panel-subtitle">Adjust loading, gap stability, fixation hardware, MSC activity, or bone graft</span>
+        </div>
+      </div>
+
+      <div class="panel-body">
+
+        <!-- SHARED PARAMETER CONTROLS: 8 PRESETS + 4 ORGANIZED CONTROL GROUPS -->
+        <div class="controls-shared-box">
+          <div class="section-label">
+            <span>Clinical &amp; Research Scenarios (One-Click Presets)</span>
+            <span style="font-weight:500; text-transform:none;">Click any scenario to explore</span>
+          </div>
+
+          <div class="preset-button-grid" id="preset-grid">
+            <button class="btn-preset active" data-preset="byrne_baseline">
+              <strong>1. Standard Tibia</strong>
+              <span>3 mm gap &middot; Ext. Fixator &middot; Union ~Day 122</span>
+            </button>
+            <button class="btn-preset" data-preset="unstable_cast">
+              <strong>2. Unstable Motion</strong>
+              <span>Low stiffness cast &middot; Hypertrophic delay</span>
+            </button>
+            <button class="btn-preset" data-preset="rigid_plate">
+              <strong>3. Rigid Locking Plate</strong>
+              <span>250% stiff plate &middot; Medial stress shielding</span>
+            </button>
+            <button class="btn-preset" data-preset="large_defect_nograft">
+              <strong>4. Large Defect (15 mm)</strong>
+              <span>No graft &middot; Critical-size non-union</span>
+            </button>
+            <button class="btn-preset" data-preset="large_defect_autograft">
+              <strong>5. 15 mm + Autograft</strong>
+              <span>Osteoconductive + inductive + MSCs</span>
+            </button>
+            <button class="btn-preset" data-preset="large_defect_scaffold">
+              <strong>6. 15 mm + 3D Scaffold</strong>
+              <span>Surface-guided ECM along struts</span>
+            </button>
+            <button class="btn-preset" data-preset="early_full_load">
+              <strong>7. Immediate Full Load</strong>
+              <span>100% BW Day 0 &middot; High early shear</span>
+            </button>
+            <button class="btn-preset" data-preset="impaired_msc">
+              <strong>8. Impaired MSCs (0.35&times;)</strong>
+              <span>Low proliferation/migration &middot; Slow union</span>
+            </button>
+          </div>
+
+          <!-- 4 Organized, Easy-to-Understand Control Groups -->
+          <div class="control-groups-grid">
+
+            <!-- Group A: External Loading & Rehab -->
+            <div class="control-group-card">
+              <div class="control-group-title">
+                <span>A. External Loading</span>
+                <span style="font-weight:500; text-transform:none; color:var(--color-text-muted);">Gait &amp; Rehab</span>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="slider-load">Peak Gait Load:</label>
+                  <span class="badge-value" id="val-load">1.0&times; BW (80 kg)</span>
+                </div>
+                <input type="range" id="slider-load" min="0.2" max="2.0" step="0.1" value="1.0" class="range-slider">
+                <div class="slider-hint">
+                  <span>0.2&times; (Partial)</span>
+                  <span>1.0&times; (Normal)</span>
+                  <span>2.0&times; (Heavy)</span>
+                </div>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="select-rehab">Weight-Bearing Schedule:</label>
+                </div>
+                <select id="select-rehab" class="control-select">
+                  <option value="cautious_ramp" selected>Cautious Rehab Ramp (Byrne 2011: 10&rarr;100%)</option>
+                  <option value="immediate_full">Immediate Full Weight-Bearing (100% Day 0)</option>
+                  <option value="delayed_weight">Delayed Loading (Non-WB until Day 70)</option>
+                  <option value="minimal_load">Protected / Minimal Load (12% Constant)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Group B: Fracture Gap & Stability -->
+            <div class="control-group-card">
+              <div class="control-group-title">
+                <span>B. Fracture Gap &amp; Stability</span>
+                <span style="font-weight:500; text-transform:none; color:var(--color-text-muted);">Defect Geometry</span>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="slider-gap">Fracture Gap Width:</label>
+                  <span class="badge-value" id="val-gap">3.0 mm</span>
+                </div>
+                <input type="range" id="slider-gap" min="1.0" max="25.0" step="0.5" value="3.0" class="range-slider">
+                <div class="slider-hint">
+                  <span>1 mm (Hairline)</span>
+                  <span>3 mm (Byrne)</span>
+                  <span>25 mm (Critical)</span>
+                </div>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="slider-callus-index">Callus Index (Stability):</label>
+                  <span class="badge-value" id="val-callus-index">1.40&times;</span>
+                </div>
+                <input type="range" id="slider-callus-index" min="1.0" max="1.8" step="0.05" value="1.4" class="range-slider">
+                <div class="slider-hint">
+                  <span>1.0&times; (No Bulge)</span>
+                  <span>1.4&times; (Standard)</span>
+                  <span>1.8&times; (Large)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Group C: Fixation Type & Stiffness -->
+            <div class="control-group-card">
+              <div class="control-group-title">
+                <span>C. Fixation Type &amp; Stiffness</span>
+                <span style="font-weight:500; text-transform:none; color:var(--color-text-muted);">Hardware</span>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="select-fixation">Fixation Method:</label>
+                </div>
+                <select id="select-fixation" class="control-select">
+                  <option value="external_fixator" selected>Unilateral External Fixator (Byrne 2011)</option>
+                  <option value="locking_plate">Medial Locking Compression Plate (Perier-Metz)</option>
+                  <option value="im_nail">Intramedullary (IM) Nail</option>
+                  <option value="cast_unfixed">Cast / Functional Brace (Low Stability)</option>
+                </select>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="slider-fix-stiff">Fixation Stiffness:</label>
+                  <span class="badge-value" id="val-fix-stiff">100%</span>
+                </div>
+                <input type="range" id="slider-fix-stiff" min="10" max="300" step="10" value="100" class="range-slider">
+                <div class="slider-hint">
+                  <span>10% (Flexible)</span>
+                  <span>100% (Nominal)</span>
+                  <span>300% (Very Rigid)</span>
+                </div>
+              </div>
+
+              <label class="inline-check-row" title="Automatically remove external fixator once bending stiffness reaches 15 Nm/deg (Richardson et al. 1994)">
+                <input type="checkbox" id="chk-auto-remove" checked>
+                <span>Auto-remove Ext. Fixator at Union (&ge; 15 Nm/deg)</span>
+              </label>
+            </div>
+
+            <!-- Group D: Callus MSC Activity & Bone Graft -->
+            <div class="control-group-card">
+              <div class="control-group-title">
+                <span>D. MSC Activity &amp; Bone Graft</span>
+                <span style="font-weight:500; text-transform:none; color:var(--color-text-muted);">Biology</span>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="select-graft">Bone Graft / Defect Material:</label>
+                </div>
+                <select id="select-graft" class="control-select">
+                  <option value="none" selected>None (Natural Hematoma / Granulation)</option>
+                  <option value="autograft">Autologous Bone Graft (Conductive + Inductive + MSCs)</option>
+                  <option value="osteoconductive_scaffold">3D Osteoconductive Scaffold (Surface-Guided ECM)</option>
+                  <option value="osteoinductive_bmp2">BMP-2 / Osteoinductive Gel (Boosts Differentiation)</option>
+                  <option value="msc_scaffold">MSC-Seeded Bioactive Scaffold</option>
+                </select>
+              </div>
+
+              <div class="control-item">
+                <div class="control-row">
+                  <label for="slider-msc-activity">Callus MSC Activity:</label>
+                  <span class="badge-value" id="val-msc-activity">1.00&times;</span>
+                </div>
+                <input type="range" id="slider-msc-activity" min="0.2" max="2.0" step="0.05" value="1.0" class="range-slider">
+                <div class="slider-hint">
+                  <span>0.2&times; (Impaired)</span>
+                  <span>1.0&times; (Healthy)</span>
+                  <span>2.0&times; (Enhanced)</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 1 PANEL: HEALING TIMELINE & STIFFNESS (Figs. 4 & 5)          -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-timeline">
+          <div class="section-label">
+            <span>Mechanical Healing Curves vs. Byrne et al. (2011) &amp; Richardson et al. (1994)</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="timeline-tag">Union Criterion: 15 Nm/deg</span>
+          </div>
+
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Bending Stiffness Over Time (Fig. 5)</div>
+                  <div class="chart-card-subtitle">4-point sagittal stiffness (Nm/deg) vs. clinical union (15 Nm/deg)</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-stiffness"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Interfragmentary Strain &mdash; IFS (Fig. 4)</div>
+                  <div class="chart-card-subtitle">Peak gap motion / gap width (%) &mdash; optimal window &approx; 2&ndash;10%</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-ifs"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">Callus Tissue Composition Evolution (0&ndash;55 Weeks)</div>
+                <div class="chart-card-subtitle">Tracking Granulation &rarr; Fibrous / Cartilage &rarr; Immature Bone &rarr; Mature Bone &amp; Resorption</div>
+              </div>
+            </div>
+            <div class="chart-container-wrapper" style="height:185px;">
+              <canvas id="chart-tissues"></canvas>
+            </div>
+          </div>
+
+          <div class="theory-callout">
+            <strong>Reading the Healing Curves:</strong> Early in healing, low callus stiffness allows moderate interfragmentary strain (IFS &approx; 3&ndash;8%), stimulating chondrogenesis and osteogenesis. As cartilage mineralizes and bony bridging connects the periphery, IFS drops below 1%, bending stiffness surpasses <strong>15 Nm/deg</strong> (clinical union, allowing fixator removal), and low-strain regions in the external callus and marrow cavity undergo <strong>osteoclastic remodeling</strong> toward normal intact stiffness (~60&ndash;75 Nm/deg).
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 2 PANEL: MECHANOREGULATION DIAGRAM (Byrne Fig. 3)            -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-stimulus" style="display:none;">
+          <div class="section-label">
+            <span>Prendergast Biophysical Stimulus Phase Space (Live at Selected Day)</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="stimulus-day-tag">Day 122 Snapshot</span>
+          </div>
+
+          <div class="pde-metrics-strip">
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Resorption Band</span>
+              <span class="pde-stat-val">S &le; 0.01</span>
+              <span class="pde-stat-sub">Osteoclasts remove unloaded bone</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Mature Bone</span>
+              <span class="pde-stat-val">0.01 &lt; S &le; 0.53</span>
+              <span class="pde-stat-sub">Lamellar / Mature Osteoblasts</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Immature Bone</span>
+              <span class="pde-stat-val">0.53 &lt; S &le; 1.0</span>
+              <span class="pde-stat-sub">Woven Bone Ossification</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Cartilage / Fibrous</span>
+              <span class="pde-stat-val">1 &lt; S &le; 3 / S &gt; 3</span>
+              <span class="pde-stat-sub">High strain / fluid flow</span>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">Interstitial Fluid Flow (\(\mu\text{m/s}\)) vs. Tissue Shear Strain (\(\%\)) &mdash; Fig. 3</div>
+                <div class="chart-card-subtitle">Each point is a callus element colored by anatomical zone (Fracture Gap, Medullary Cavity, External Callus)</div>
+              </div>
+            </div>
+            <div class="chart-container-wrapper tall">
+              <canvas id="chart-mechanoreg"></canvas>
+            </div>
+          </div>
+
+          <div class="theory-callout">
+            <strong>How Cells Sense Mechanics (\(S = \gamma/a + v/b\)):</strong> Every callus location experiences both matrix distortion (octahedral shear strain \(\gamma\), with \(a = 3.75\%\)) and pore-fluid squeezing (interstitial fluid velocity \(v\), with \(b = 3\ \mu\text{m/s}\)). As the callus stiffens from \(0.2\text{ MPa}\) granulation toward \(6{,}000\text{–}17{,}000\text{ MPa}\) bone, points migrate down-and-left from the <strong>Fibrous/Cartilage</strong> region into the <strong>Bone</strong> and <strong>Resorption</strong> bands.
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 3 PANEL: SPATIAL CALLUS & GRAFT EFFECTS                      -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-spatial" style="display:none;">
+          <div class="section-label">
+            <span>Regional Tissue Distribution &amp; Bone Graft / Fixation Comparison</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="spatial-day-tag">Day 122 Breakdown</span>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Anatomical Region</th>
+                  <th>Bone (%)</th>
+                  <th>Cartilage (%)</th>
+                  <th>Fibrous (%)</th>
+                  <th>Mean Stimulus S</th>
+                  <th>Dominant Process</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-regions"></tbody>
+            </table>
+          </div>
+
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Regional Tissue Composition (At Selected Day)</div>
+                  <div class="chart-card-subtitle">Posterior vs. Anterior bending asymmetry &amp; plate shielding</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-regions"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Bone Graft Impact on Critical Defects (15 mm)</div>
+                  <div class="chart-card-subtitle">Final Week-35 Stiffness across graft strategies (Perier-Metz 2020)</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-graft-compare"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="theory-callout">
+            <strong>Why Location Matters (Byrne 2011 &amp; Perier-Metz 2020):</strong> Sagittal gait bending compresses the <strong>posterior gap</strong> more than the anterior gap, driving higher posterior bone formation while the anterior gap may resorb earlier. Under a <strong>rigid medial locking plate</strong>, stress shielding lowers strain directly beneath the plate while favoring contralateral bridging. In <strong>large segmental defects (&ge;10 mm)</strong>, endogenous MSCs stall after ~15 days without an osteoconductive graft/scaffold, causing marrow capping and non-union.
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 4 PANEL: HOW THE MODEL WORKS (Fig. 1 & Tables 1-2)           -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-model" style="display:none;">
+          <div class="section-label">
+            <span>Coupled Mechanobiology &amp; Lattice Random-Walk Loop (Byrne 2011 Fig. 1)</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);">48 h Iteration Step</span>
+          </div>
+
+          <div class="flowchart-grid">
+            <div class="flow-step-card">
+              <span class="flow-step-num">STEP 1</span>
+              <span class="flow-step-title">Structural &amp; Fluid FE</span>
+              <span class="flow-step-desc">Apply gait knee/muscle loads &amp; fixation sharing; compute \(\gamma\) and \(v\).</span>
+            </div>
+            <div class="flow-step-card">
+              <span class="flow-step-num">STEP 2</span>
+              <span class="flow-step-title">Stimulus \(S\)</span>
+              <span class="flow-step-desc">Evaluate \(S = \gamma/0.0375 + v/3\) at every callus lattice site.</span>
+            </div>
+            <div class="flow-step-card">
+              <span class="flow-step-num">STEP 3</span>
+              <span class="flow-step-title">Random-Walk Cells</span>
+              <span class="flow-step-desc">Motile MSCs &amp; fibroblasts migrate (\(30\ \mu\text{m/h}\)) and proliferate.</span>
+            </div>
+            <div class="flow-step-card">
+              <span class="flow-step-num">STEP 4</span>
+              <span class="flow-step-title">Age &amp; Differentiate</span>
+              <span class="flow-step-desc">MSCs &gt;6 days old differentiate into osteoblasts, chondrocytes, or fibroblasts; out-of-band cells apoptose (\(15\%/\text{d}\)).</span>
+            </div>
+            <div class="flow-step-card">
+              <span class="flow-step-num">STEP 5</span>
+              <span class="flow-step-title">Update \(E, k\) &amp; Bend</span>
+              <span class="flow-step-desc">10-step history + maturation ramp; check \(15\text{ Nm/deg}\) union for fixator removal.</span>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tissue Phenotype</th>
+                  <th>Stimulus Band \(S\)</th>
+                  <th>Modulus \(E\) (MPa)</th>
+                  <th>Poisson \(\nu\)</th>
+                  <th>Permeability (\(\times 10^{-14}\))</th>
+                  <th>Maturation / Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Granulation</td>
+                  <td>Initial (Day 0)</td>
+                  <td>0.2</td>
+                  <td>0.167</td>
+                  <td>1.00</td>
+                  <td>Initial hematoma callus</td>
+                </tr>
+                <tr>
+                  <td>Fibrous Tissue</td>
+                  <td>\(S &gt; 3.0\)</td>
+                  <td>2.0</td>
+                  <td>0.167</td>
+                  <td>1.00</td>
+                  <td>Motile fibroblasts (30 &mu;m/h)</td>
+                </tr>
+                <tr>
+                  <td>Cartilage</td>
+                  <td>\(1.0 &lt; S \le 3.0\)</td>
+                  <td>10.0</td>
+                  <td>0.167</td>
+                  <td>0.50</td>
+                  <td>16-day maturation (chondrocytes)</td>
+                </tr>
+                <tr>
+                  <td>Immature Bone</td>
+                  <td>\(0.53 &lt; S \le 1.0\)</td>
+                  <td>1,000</td>
+                  <td>0.30</td>
+                  <td>10.0</td>
+                  <td>30-day ramp; woven &rarr; mature 60 d</td>
+                </tr>
+                <tr>
+                  <td>Mature Bone</td>
+                  <td>\(0.01 &lt; S \le 0.53\)</td>
+                  <td>6,000</td>
+                  <td>0.30</td>
+                  <td>1.02</td>
+                  <td>Adapts to cortical (400 d)</td>
+                </tr>
+                <tr>
+                  <td>Cortical / Fixator</td>
+                  <td>Intact / Hardware</td>
+                  <td>17,000 / 200,000</td>
+                  <td>0.30</td>
+                  <td>&mdash;</td>
+                  <td>Linear elastic bone &amp; implant</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="theory-callout">
+            <strong>Why This Model Predicts Both Healing &amp; Remodeling:</strong> Unlike pure continuum diffusion models, the <strong>random-walk lattice</strong> captures cell-age delays (&gt;6 days before MSC differentiation), phenotype-specific motility (MSCs &amp; fibroblasts migrate, osteoblasts &amp; chondrocytes stay put), and osteoclast resorption when stabilized bone enters \(S \le 0.01\).
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: THEORY & EQUATIONS (Byrne 2011 + Perier-Metz 2020)               -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" id="modal-theory">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>&#128214; Theory &amp; Computational Model &mdash; Byrne et al. (2011) &amp; Perier-Metz et al. (2020)</h3>
+        <button class="modal-close-btn" data-close="modal-theory">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <h4>1. Biophysical Mechanoregulation Stimulus (Prendergast et al. 1997; Lacroix &amp; Prendergast 2002)</h4>
+        <p>
+          Bone healing depends on how mechanical loads (patient activity) and implant stiffness translate into local tissue distortion and interstitial fluid motion inside the fracture callus. At each point in the biphasic poroelastic callus, the mechanoregulation stimulus \(S\) combines octahedral shear strain \(\gamma\) and relative fluid/solid velocity \(v\):
+        </p>
+        <div class="math-display-box">
+          \[S = \frac{\gamma}{a} + \frac{v}{b}, \qquad a = 0.0375\ (3.75\%\text{ strain}), \quad b = 3\ \mu\text{m/s}\]
+        </div>
+        <p>
+          Depending on \(S\), progenitor mesenchymal stem cells (MSCs) differentiate along distinct lineages: <strong>fibrous tissue</strong> (\(S &gt; 3\)), <strong>cartilage</strong> (\(1 &lt; S \le 3\)), <strong>immature woven bone</strong> (\(0.53 &lt; S \le 1\)), <strong>mature bone</strong> (\(0.01 &lt; S \le 0.53\)), or <strong>osteoclastic bone resorption</strong> (\(S \le 0.01\)).
+        </p>
+
+        <h4>2. Lattice Cell Activity &amp; Material Evolution (Byrne et al. 2011, Table 1 &amp; 2)</h4>
+        <p>
+          Precursor MSCs originate from the periosteum, endosteum, and bone marrow cavity. Motile cells (MSCs and fibroblasts) disperse via a nearest-neighbor random walk at \(30\ \mu\text{m/h}\). An MSC must reach a critical age of <strong>&gt; 6 days</strong> before differentiating (rate \(0.3/\text{day}\)). Differentiated cells proliferate only within their favorable \(S\) band and undergo apoptosis at \(15\%/\text{day}\) outside it. Local element Young's modulus \(E\) is averaged across the last 10 iterations (rule of mixtures + 30-day synthesis curve) and woven bone adapts toward lamellar/cortical bone (\(17{,}000\text{ MPa}\)).
+        </p>
+
+        <h4>3. Physiological Tibial Gait Loading (45% Gait Cycle, 80 kg Body Weight &mdash; Electronic Supplement)</h4>
+        <p>
+          Byrne et al. (2011) applied realistic 3D muscle and joint contact forces from Duda et al. (2001, 2002) at the second peak of ground reaction force (45% gait cycle), ramped cautiously from \(10\% \to 20\%\) over Days 0&ndash;48 and \(20\% \to 100\%\) over Days 48&ndash;174:
+        </p>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Anatomical Structure</th>
+                <th>Force X (N)</th>
+                <th>Force Y (N)</th>
+                <th>Force Z Axial (N)</th>
+                <th>Attachment Z (mm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Knee Joint Contact (60/40 M/L)</td><td>232.3</td><td>214.9</td><td>&minus;1528.1</td><td>288.2</td></tr>
+              <tr><td>Ankle Joint Contact</td><td>&minus;120.0</td><td>154.4</td><td>2070.4</td><td>0.4</td></tr>
+              <tr><td>Soleus Muscle</td><td>&minus;63.1</td><td>&minus;47.1</td><td>&minus;697.0</td><td>332.2</td></tr>
+              <tr><td>Quadriceps Femoris</td><td>13.6</td><td>&minus;328.0</td><td>303.5</td><td>353.4</td></tr>
+              <tr><td>Tibialis Anterior (I &amp; II)</td><td>43.1</td><td>92.3</td><td>&minus;519.5</td><td>251.8 / 127.9</td></tr>
+              <tr><td>Iliotibial Tract (I &amp; II)</td><td>&minus;105.9</td><td>&minus;73.2</td><td>352.8</td><td>369.9 / 370.5</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>4. Large Defects, Fixation Stiffness &amp; Bone Graft Stimulation (Perier-Metz et al. 2020)</h4>
+        <p>
+          In large segmental defects, unstimulated endogenous progenitor cells cease migrating/proliferating after a ~15-day latency period, causing marrow cavity capping and non-union. Adding an <strong>autologous bone graft</strong> or <strong>3D osteoconductive scaffold</strong> restores healing via three mechanisms: (1) <em>osteoconduction</em> (guiding MSC migration/proliferation across the defect), (2) <em>surface-guided ECM deposition</em> along scaffold struts, and (3) <em>osteoinduction</em> (increasing osteogenic differentiation from \(0.3 \to 0.5/\text{day}\)). Rigid medial locking plates also introduce asymmetric strain shielding directly under the plate compared to the far cortex.
+        </p>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: PRACTICE QUIZ (BME 5313 / 6303)                                  -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" id="modal-quiz">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>&#9997;&#65039; Practice Quiz: Bone Fracture Healing &amp; Mechanoregulation</h3>
+        <button class="modal-close-btn" data-close="modal-quiz">&times;</button>
+      </div>
+      <div class="modal-body" id="quiz-container">
+        <!-- Populated dynamically by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- SITE FOOTER                                                               -->
+  <!-- ========================================================================= -->
+  <footer class="site-footer">
+    <p>
+      &copy; 2026 Lawrence Technological University &middot; Experimental Biomechanics Laboratory (EBL) &middot; Dr. Eric G. Meyer<br>
+      Developed for <strong>BME 5313 / 6303: Cellular Mechanobiology</strong> &middot; Models: Byrne, Lacroix &amp; Prendergast (2011), <em>J Orthop Res</em> 29:1496&ndash;1503; Perier-Metz, Duda &amp; Checa (2020), <em>Front Bioeng Biotechnol</em> 8:585799.
+    </p>
+  </footer>
+
+  <!-- Main Application Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
